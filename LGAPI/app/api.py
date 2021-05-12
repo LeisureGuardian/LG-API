@@ -36,14 +36,6 @@ async def get_single_post(id: int) -> dict:
                 "data": post
             }
 
-@app.post("/posts", tags=["posts"])
-async def add_post(post: PostSchema) -> dict:
-    post.id = len(posts) + 1
-    posts.append(post.dict())
-    return {
-        "data": "post added."
-    }
-
 @app.post("/user/signup", tags=["user"])
 async def create_user(user: UserSchema = Body(...)):
     users.append(user) # 여기서는 데이터를 그저 배열에 저장할뿐 나중에 DB에 해쉬 해서 저장할것
