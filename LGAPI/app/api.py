@@ -1,13 +1,15 @@
 from fastapi import FastAPI, Body, Depends
+from fastapi.middleware.cors import CORSMiddleware
 from app.model import PostSchema, UserSchema, UserLoginSchema
 from app.auth.auth_handler import signJWT
 from app.auth.auth_bearer import JWTBearer
 
 
-posts = [] # DB 대신 쓰는 배열
-users = [] # DB 대신 쓰는 배열
+posts = []  # DB 대신 쓰는 배열
+users = []  # DB 대신 쓰는 배열
 
 app = FastAPI()
+
 
 def check_user(data: UserLoginSchema):
     for user in users:
@@ -15,13 +17,16 @@ def check_user(data: UserLoginSchema):
             return True
     return False
 
+
 @app.get("/", tags=["root"])
 async def read_root() -> dict:
     return {"message": "WORKING !!!"}
 
+
 @app.get("/posts", tags=["posts"])
 async def get_posts() -> dict:
-    return { "data": posts }
+    return {"data": posts}
+
 
 @app.get("/posts/{id}", tags=["posts"])
 async def get_single_post(id: int) -> dict:
@@ -36,10 +41,12 @@ async def get_single_post(id: int) -> dict:
                 "data": post
             }
 
+
 @app.post("/user/signup", tags=["user"])
 async def create_user(user: UserSchema = Body(...)):
-    users.append(user) # 여기서는 데이터를 그저 배열에 저장할뿐 나중에 DB에 해쉬 해서 저장할것
+    users.append(user)  # 여기서는 데이터를 그저 배열에 저장할뿐 나중에 DB에 해쉬 해서 저장할것
     return signJWT(user.email)
+
 
 @app.post("/user/login", tags=["user"])
 async def user_login(user: UserLoginSchema = Body(...)):
@@ -48,6 +55,7 @@ async def user_login(user: UserLoginSchema = Body(...)):
     return {
         "error": "Login Failed"
     }
+
 
 @app.post("/posts", dependencies=[Depends(JWTBearer())], tags=["posts"])
 async def add_post(post: PostSchema) -> dict:
