@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, EmailStr
-
+import jwt
 
 class PostSchema(BaseModel):
     id: int = Field(default=None)
@@ -16,6 +16,8 @@ class PostSchema(BaseModel):
 
 
 class UserSchema(BaseModel):
+    id: int = Field(default=None)
+    organization: str = Field(...)
     fullname: str = Field(...)
     email: EmailStr = Field(...)
     password: str = Field(...)
@@ -23,6 +25,7 @@ class UserSchema(BaseModel):
     class Config:
         schema_extra = {
             "example": {
+                "organization": "낙동강조정경기장",
                 "fullname": "wooseok jang",
                 "email": "mmyu2090@gmail.com",
                 "password": "SuperPowerfulPW"
@@ -44,6 +47,7 @@ class UserLoginSchema(BaseModel):
 
 
 class DeviceStatusSchema(BaseModel):
+    id: int = Field(default=None)
     deviceSerial: int = Field(...)
     longitude: float = Field(...)
     latitude: float = Field(...)
@@ -66,5 +70,22 @@ class DeviceStatusSchema(BaseModel):
                 "batteryLevel": "50",
                 "critical": "0",
                 "button": "0"
+            }
+        }
+
+class DeviceSchema(BaseModel):
+    id: int = Field(default=None)
+    deviceSerial: int = Field(...)
+    deviceName: str = Field(...)
+    organization: str = Field(...)
+    addedDate: str = Field(default=None)
+    lastStatus: int = Field(default=None)
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "deviceSerial": "1",
+                "deviceName":"장치 1번",
+                "organization": "낙동강조정경기장"
             }
         }
