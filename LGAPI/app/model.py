@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field, EmailStr
 import jwt
 
+
 class PostSchema(BaseModel):
     id: int = Field(default=None)
     title: str = Field(...)
@@ -73,11 +74,12 @@ class DeviceStatusSchema(BaseModel):
             }
         }
 
+
 class DeviceSchema(BaseModel):
     id: int = Field(default=None)
     deviceSerial: int = Field(...)
     deviceName: str = Field(...)
-    organization: str = Field(...)
+    organization: str = Field(default=None)
     addedDate: str = Field(default=None)
     lastStatus: int = Field(default=None)
 
@@ -85,7 +87,6 @@ class DeviceSchema(BaseModel):
         schema_extra = {
             "example": {
                 "deviceSerial": "1",
-                "deviceName":"장치 1번",
-                "organization": "낙동강조정경기장"
+                "deviceName": "장치 1번"
             }
         }

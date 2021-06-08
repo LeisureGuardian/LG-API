@@ -1,159 +1,200 @@
-from fastapi import FastAPI, Body, Depends, Header
+from fastapi import FastAPI, Body, Depends, Header, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from app.model import PostSchema, UserSchema, UserLoginSchema, DeviceStatusSchema, DeviceSchema
 from app.auth.auth_handler import signJWT, JWT_SECRET, JWT_ALGORITHM
 from app.auth.auth_bearer import JWTBearer
+from app.db import DB
 import datetime
 from typing import Optional
 import jwt
+import pymysql
 
 
 posts = []  # DB 대신 쓰는 배열
-users = []  # DB 대신 쓰는 배열
 deviceDatas = []
-devices= []
+devices = []
 
 app = FastAPI()
+mydb = DB()
 
-origins = ["*", "localhost:3000",
+origins = ["http://localhost", "http://localhost:3000",
+           "http://localhost:8000", "http://localhost:8080",
+           "https://localhost", "https://localhost:3000",
+           "https://localhost:8000", "https://localhost:8080",
+           "localhost", "localhost:3000",
            "localhost:8000", "localhost:8080"]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=['GET', 'POST'],
     allow_headers=["*"],
 )
 
 
 def check_user(data: UserLoginSchema):
-    for user in users:
-        if user.email == data.email and user.password == data.password:
+    dbUser = mydb.getUser(data)
+    try:
+        if dbUser[2] == data.password:
             return True
+    except TypeError:
+        return False
     return False
 
 
 @app.get("/", tags=["root"])
 async def read_root() -> dict:
-    return {"message": "WORKING !!!"}
-
-
-@app.get("/posts", tags=["posts"])
-async def get_posts() -> dict:
-    return {"data": posts}
-
-
-@app.get("/posts/{id}", tags=["posts"])
-async def get_single_post(id: int) -> dict:
-    if id > len(posts):
-        return {
-            "error": "No such post with the supplied ID."
-        }
-
-    for post in posts:
-        if post["id"] == id:
-            return {
-                "data": post
-            }
+    item = {"message": "WORKING !!!"}
+    return JSONResponse(status_code=status.HTTP_200_OK, content=item)
 
 
 @app.post("/user/signup", tags=["user"])
 async def create_user(user: UserSchema = Body(...)):
-    users.append(user)  # 여기서는 데이터를 그저 배열에 저장할뿐 나중에 DB에 해쉬 해서 저장할것
+    try:
+        mydb.addUser(user)
+    except pymysql.err.IntegrityError:
+        item = {
+            "error": "Duplicate email"
+        }
+        return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content=item)
     return signJWT(user.email)
+
 
 @app.post("/user/login", tags=["user"])
 async def user_login(user: UserLoginSchema = Body(...)):
     if check_user(user):
         return signJWT(user.email)
-    return {
+    item = {
         "error": "Login Failed"
     }
-
-
-@app.post("/posts", dependencies=[Depends(JWTBearer())], tags=["posts"])
-async def add_post(post: PostSchema) -> dict:
-    post.id = len(posts) + 1
-    posts.append(post.dict())
-    return {
-        "data": "post added."
-    }
-
-@app.post("/deviceData", tags=["deviceData"])
-async def add_data(deviceData: DeviceStatusSchema) -> dict:
-    deviceData.id = len(deviceDatas) + 1
-    deviceDatas.append(deviceData.dict())
-    for device in devices:
-        if device["deviceSerial"] == deviceData["deviceSerial"]:
-            device["lastStatus"] = deviceData.id
-            return {
-                "data": "deviceData added."
-            }
-    return {
-        "error": "No such device with that supplied ID."
-    }
+    return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content=item)
 
 
 @app.post("/device", dependencies=[Depends(JWTBearer())], tags=["device"])
-async def add_device(device: DeviceSchema) -> dict:
-    device.id = len(devices) + 1
-    device.lastStatus = 0
+async def add_device(device: DeviceSchema, Authorization: Optional[str] = Header(None)) -> dict:
+    token = Authorization[7:]
+    user_id = jwt.decode(token, JWT_SECRET, algorithms=[
+                         JWT_ALGORITHM])["user_id"]
+    organization = mydb.getOrganization(user_id)
+    device.organization = organization
     now = datetime.datetime.now()
     nowstr = "%04d%02d%02d" % (now.year, now.month, now.day)
     device.addedDate = nowstr
-    devices.append(device.dict())
-    return{
+    try:
+        mydb.addDevice(device)
+    except pymysql.err.IntegrityError:
+        item = {
+            "error": "The device is already registered "
+        }
+        return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content=item)
+    item = {
         "data": "device added."
     }
-
-@app.get("/device/{id}", dependencies=[Depends(JWTBearer())], tags=["device"])
-async def get_single_device(id: int) -> dict:
-    if id > len(posts):
-        return {
-            "error": "No such device with that supplied ID."
-        }
-
-    for device in devices:
-        if device["id"] == id:
-            return {
-                "data": device
-            }
+    return JSONResponse(status_code=status.HTTP_201_CREATED, content=item)
 
 
 @app.get("/device", dependencies=[Depends(JWTBearer())], tags=["device"])
 async def get_device_list(Authorization: Optional[str] = Header(None)):
     token = Authorization[7:]
-    user_id = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])["user_id"]
-    list = []
-    organization = ""
-    for user in users:
-        if user["email"] == user_id:
-            organization = user["organization"]
-            break
+    user_id = jwt.decode(token, JWT_SECRET, algorithms=[
+                         JWT_ALGORITHM])["user_id"]
+    devices = mydb.getDeviceAll(user_id)
+    deviceList = []
     for device in devices:
-        if device["organization"] == organization:
-            list.append(device)
-    return {
-        "data": list
+        deviceList.append(list(device))
+    for dev in deviceList:
+        del dev[0]
+    item = {
+        "data": deviceList
     }
+    return JSONResponse(status_code=status.HTTP_200_OK, content=item)
+
+
+@app.get("/device/{id}", dependencies=[Depends(JWTBearer())], tags=["device"])
+async def get_single_device(id: int, Authorization: Optional[str] = Header(None)) -> dict:
+    token = Authorization[7:]
+    user_id = jwt.decode(token, JWT_SECRET, algorithms=[
+                         JWT_ALGORITHM])["user_id"]
+    organization = mydb.getOrganization(user_id)
+    device = mydb.getDeviceSingle(id)
+    try:
+        device = list(device)
+    except TypeError:
+        item = {
+            "error": "The device has not registered or not exist"
+        }
+        return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content=item)
+    del device[0]
+    if(device[2] == organization):
+        item = {
+            "data": device
+        }
+        return JSONResponse(status_code=status.HTTP_200_OK, content=item)
+    elif(device[2] != organization):
+        item = {
+            "error": "You have no permission to access that device"
+        }
+        return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content=item)
+
+
+@app.delete("/device/{id}", dependencies=[Depends(JWTBearer())], tags=["device"])
+async def delete_single_device(id: int, Authorization: Optional[str] = Header(None)) -> dict:
+    token = Authorization[7:]
+    user_id = jwt.decode(token, JWT_SECRET, algorithms=[
+                         JWT_ALGORITHM])["user_id"]
+    organization = mydb.getOrganization(user_id)
+    device = mydb.getDeviceSingle(id)
+    try:
+        device = list(device)
+    except TypeError:
+        item = {
+            "error": "The device has not registered or not exist"
+        }
+        return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content=item)
+    del device[0]
+    if(device[2] == organization):
+        device = mydb.deleteDeviceSingle(id)
+        item = {
+            "data": "device deleted"
+        }
+        return JSONResponse(status_code=status.HTTP_200_OK, content=item)
+    elif(device[2] != organization):
+        item = {
+            "error": "You have no permission to access that device"
+        }
+        return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content=item)
+
+
+@app.post("/deviceData", tags=["deviceData"])
+async def add_data(deviceData: DeviceStatusSchema) -> dict:
+    mydb.addDeviceStatus(deviceData)
+    item = {
+        "data": "deviceData added."
+    }
+    return JSONResponse(status_code=status.HTTP_201_CREATED, content=item)
+
 
 @app.get("/deviceData", dependencies=[Depends(JWTBearer())], tags=["deviceData"])
 async def get_deviceData_list(Authorization: Optional[str] = Header(None)):
     token = Authorization[7:]
-    user_id = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])["user_id"]
-    organization = ""
-    list = []
-    list2 = []
-    for user in users:
-        if user["email"] == user_id:
-            organization = user["organization"]
-            break
-    for device in devices:
-        if device["organization"] == organization:
-            list.append(device["lastStatus"])
-    for value in list:
-        list2.append(deviceDatas[value - 1])
-    return {
-        "data": list2
+    user_id = jwt.decode(token, JWT_SECRET, algorithms=[
+                         JWT_ALGORITHM])["user_id"]
+    devicestatus = mydb.getDeviceStatus(user_id)
+    statusList = []
+    print(devicestatus)
+    for tuple in devicestatus:
+        try:
+            statusList.append(list(tuple))
+        except TypeError:
+            statusList.append(None)
+    for stat in statusList:
+        try:
+            del stat[0]
+        except TypeError:
+            None
+    item = {
+        "data": statusList
     }
+    return JSONResponse(status_code=status.HTTP_200_OK, content=item)
