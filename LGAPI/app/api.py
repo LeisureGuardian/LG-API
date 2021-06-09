@@ -122,6 +122,7 @@ async def get_single_device(id: int, Authorization: Optional[str] = Header(None)
                          JWT_ALGORITHM])["user_id"]
     organization = mydb.getOrganization(user_id)
     device = mydb.getDeviceSingle(id)
+    deviceDiction = ["deviceSerial", "deviceName", "organization", "addedDate"]
     try:
         device = list(device)
     except TypeError:
@@ -132,7 +133,7 @@ async def get_single_device(id: int, Authorization: Optional[str] = Header(None)
     del device[0]
     if(device[2] == organization):
         item = {
-            "data": device
+            "data": dict(zip(deviceDiction, device))
         }
         return JSONResponse(status_code=status.HTTP_200_OK, content=item)
     elif(device[2] != organization):
@@ -142,7 +143,7 @@ async def get_single_device(id: int, Authorization: Optional[str] = Header(None)
         return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content=item)
 
 
-@app.delete("/device/{id}", dependencies=[Depends(JWTBearer())], tags=["device"])
+@ app.delete("/device/{id}", dependencies=[Depends(JWTBearer())], tags=["device"])
 async def delete_single_device(id: int, Authorization: Optional[str] = Header(None)) -> dict:
     token = Authorization[7:]
     user_id = jwt.decode(token, JWT_SECRET, algorithms=[
@@ -170,7 +171,7 @@ async def delete_single_device(id: int, Authorization: Optional[str] = Header(No
         return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content=item)
 
 
-@app.post("/deviceData", tags=["deviceData"])
+@ app.post("/deviceData", tags=["deviceData"])
 async def add_data(deviceData: DeviceStatusSchema) -> dict:
     mydb.addDeviceStatus(deviceData)
     item = {
@@ -179,7 +180,7 @@ async def add_data(deviceData: DeviceStatusSchema) -> dict:
     return JSONResponse(status_code=status.HTTP_201_CREATED, content=item)
 
 
-@app.get("/deviceData", dependencies=[Depends(JWTBearer())], tags=["deviceData"])
+@ app.get("/deviceData", dependencies=[Depends(JWTBearer())], tags=["deviceData"])
 async def get_deviceData_list(Authorization: Optional[str] = Header(None)):
     token = Authorization[7:]
     user_id = jwt.decode(token, JWT_SECRET, algorithms=[
@@ -189,7 +190,6 @@ async def get_deviceData_list(Authorization: Optional[str] = Header(None)):
     statusList2 = []
     statusDiction = ["deviceSerial", "longitude", "latitude", "temp",
                      "accelMax", "heartRate", "batteryLevel", "critical", "button"]
-    print(devicestatus)
     for tuple in devicestatus:
         try:
             statusList.append(list(tuple))
