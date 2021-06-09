@@ -102,12 +102,15 @@ async def get_device_list(Authorization: Optional[str] = Header(None)):
                          JWT_ALGORITHM])["user_id"]
     devices = mydb.getDeviceAll(user_id)
     deviceList = []
+    deviceList2 = []
+    deviceDiction = ["deviceSerial", "deviceName", "organization", "addedDate"]
     for device in devices:
         deviceList.append(list(device))
     for dev in deviceList:
         del dev[0]
+        deviceList2.append(dict(zip(deviceDiction, dev)))
     item = {
-        "data": deviceList
+        "data": deviceList2
     }
     return JSONResponse(status_code=status.HTTP_200_OK, content=item)
 
@@ -183,6 +186,9 @@ async def get_deviceData_list(Authorization: Optional[str] = Header(None)):
                          JWT_ALGORITHM])["user_id"]
     devicestatus = mydb.getDeviceStatus(user_id)
     statusList = []
+    statusList2 = []
+    statusDiction = ["deviceSerial", "longitude", "latitude", "temp",
+                     "accelMax", "heartRate", "batteryLevel", "critical", "button"]
     print(devicestatus)
     for tuple in devicestatus:
         try:
@@ -192,9 +198,10 @@ async def get_deviceData_list(Authorization: Optional[str] = Header(None)):
     for stat in statusList:
         try:
             del stat[0]
+            statusList2.append(dict(zip(statusDiction, stat)))
         except TypeError:
             None
     item = {
-        "data": statusList
+        "data": statusList2
     }
     return JSONResponse(status_code=status.HTTP_200_OK, content=item)
