@@ -29,9 +29,14 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=['GET', 'POST'],
+    allow_methods=['GET', 'POST', 'DELETE', 'OPTIONS'],
     allow_headers=["*"],
 )
+
+
+def check_db(mydb):
+    if mydb.checkDB():
+        mydb = DB()
 
 
 def check_user(data: UserLoginSchema):
@@ -46,12 +51,14 @@ def check_user(data: UserLoginSchema):
 
 @app.get("/", tags=["root"])
 async def read_root() -> dict:
+    check_db(mydb)
     item = {"message": "WORKING !!!"}
     return JSONResponse(status_code=status.HTTP_200_OK, content=item)
 
 
 @app.post("/user/signup", tags=["user"])
 async def create_user(user: UserSchema = Body(...)):
+    check_db(mydb)
     try:
         mydb.addUser(user)
     except pymysql.err.IntegrityError:
@@ -64,6 +71,7 @@ async def create_user(user: UserSchema = Body(...)):
 
 @app.post("/user/login", tags=["user"])
 async def user_login(user: UserLoginSchema = Body(...)):
+    check_db(mydb)
     if check_user(user):
         return signJWT(user.email)
     item = {
@@ -74,6 +82,7 @@ async def user_login(user: UserLoginSchema = Body(...)):
 
 @app.post("/device", dependencies=[Depends(JWTBearer())], tags=["device"])
 async def add_device(device: DeviceSchema, Authorization: Optional[str] = Header(None)) -> dict:
+    check_db(mydb)
     token = Authorization[7:]
     user_id = jwt.decode(token, JWT_SECRET, algorithms=[
                          JWT_ALGORITHM])["user_id"]
@@ -97,6 +106,7 @@ async def add_device(device: DeviceSchema, Authorization: Optional[str] = Header
 
 @app.get("/device", dependencies=[Depends(JWTBearer())], tags=["device"])
 async def get_device_list(Authorization: Optional[str] = Header(None)):
+    check_db(mydb)
     token = Authorization[7:]
     user_id = jwt.decode(token, JWT_SECRET, algorithms=[
                          JWT_ALGORITHM])["user_id"]
@@ -117,6 +127,7 @@ async def get_device_list(Authorization: Optional[str] = Header(None)):
 
 @app.get("/device/{id}", dependencies=[Depends(JWTBearer())], tags=["device"])
 async def get_single_device(id: int, Authorization: Optional[str] = Header(None)) -> dict:
+    check_db(mydb)
     token = Authorization[7:]
     user_id = jwt.decode(token, JWT_SECRET, algorithms=[
                          JWT_ALGORITHM])["user_id"]
@@ -145,6 +156,7 @@ async def get_single_device(id: int, Authorization: Optional[str] = Header(None)
 
 @ app.delete("/device/{id}", dependencies=[Depends(JWTBearer())], tags=["device"])
 async def delete_single_device(id: int, Authorization: Optional[str] = Header(None)) -> dict:
+    check_db(mydb)
     token = Authorization[7:]
     user_id = jwt.decode(token, JWT_SECRET, algorithms=[
                          JWT_ALGORITHM])["user_id"]
@@ -173,6 +185,7 @@ async def delete_single_device(id: int, Authorization: Optional[str] = Header(No
 
 @ app.post("/deviceData", tags=["deviceData"])
 async def add_data(deviceData: DeviceStatusSchema) -> dict:
+    check_db(mydb)
     mydb.addDeviceStatus(deviceData)
     item = {
         "data": "deviceData added."
@@ -182,13 +195,14 @@ async def add_data(deviceData: DeviceStatusSchema) -> dict:
 
 @ app.get("/deviceData", dependencies=[Depends(JWTBearer())], tags=["deviceData"])
 async def get_deviceData_list(Authorization: Optional[str] = Header(None)):
+    check_db(mydb)
     token = Authorization[7:]
     user_id = jwt.decode(token, JWT_SECRET, algorithms=[
                          JWT_ALGORITHM])["user_id"]
     devicestatus = mydb.getDeviceStatus(user_id)
     statusList = []
     statusList2 = []
-    statusDiction = ["deviceSerial", "longitude", "latitude", "temp",
+    statusDiction = ["deviceName", "longitude", "latitude", "temp",
                      "accelMax", "heartRate", "batteryLevel", "critical", "button"]
     for tuple in devicestatus:
         try:
@@ -198,7 +212,10 @@ async def get_deviceData_list(Authorization: Optional[str] = Header(None)):
     for stat in statusList:
         try:
             del stat[0]
-            statusList2.append(dict(zip(statusDiction, stat)))
+            temp = stat
+            device = mydb.getDeviceSingle(temp[0])
+            temp[0] = device[2]
+            statusList2.append(dict(zip(statusDiction, temp)))
         except TypeError:
             None
     item = {
