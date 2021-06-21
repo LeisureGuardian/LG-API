@@ -186,6 +186,24 @@ async def delete_single_device(id: int, Authorization: Optional[str] = Header(No
 @ app.post("/deviceData", tags=["deviceData"])
 async def add_data(deviceData: DeviceStatusSchema) -> dict:
     check_db(mydb)
+    try:
+        lastStatus = mydb.getDeviceStatusBySerial(deviceData.deviceSerial)
+        statusDiction = ["deviceSerial", "longitude", "latitude", "temp",
+                         "accelMax", "heartRate", "batteryLevel", "critical", "button"]
+        lastStatus = lastStatus[1:]
+        lastStatus = dict(zip(statusDiction, lastStatus))
+        deviceData2 = dict(deviceData)
+        del deviceData2['id']
+        deviceData2['longitude'] = round(deviceData2['longitude'], 3)
+        deviceData2['latitude'] = round(deviceData2['latitude'], 3)
+        deviceData2['accelMax'] = round(deviceData2['accelMax'], 3)
+        lastStatus['longitude'] = round(lastStatus['longitude'], 3)
+        lastStatus['latitude'] = round(lastStatus['latitude'], 3)
+        lastStatus['accelMax'] = round(lastStatus['accelMax'], 3)
+        if(deviceData2 == lastStatus):
+            deviceData.critical = 3
+    except TypeError:
+        None
     mydb.addDeviceStatus(deviceData)
     item = {
         "data": "deviceData added."

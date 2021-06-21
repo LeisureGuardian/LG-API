@@ -100,6 +100,13 @@ class DB:
             list.append(DB.cur.fetchone())
         return list
 
+    def getDeviceStatusBySerial(self, serial):
+        DB.sql = "SELECT * From deviceStatusTable WHERE deviceSerial='" + \
+            str(serial) + "' ORDER BY id DESC limit 1"
+        DB.cur.execute(DB.sql)
+        data = DB.cur.fetchone()
+        return data
+
     def getOrganization(self, email):
 
         DB.sql = "SELECT organization FROM userTable WHERE email='" + email + "'"
