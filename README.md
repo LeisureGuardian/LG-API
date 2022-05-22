@@ -10,4 +10,10 @@
  ```
   .env files needed for config
   
+  startup
+  
+ ```
+ python3 ./LGAPI/main.py
+ ```
+  NGINX will be needed for live server delevery
 
