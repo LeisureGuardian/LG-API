@@ -5,13 +5,13 @@
 - python 3.7 recommended
 
 ## start
-###setup
+### setup
  ```
  pip install requirements.txt
  ```
 - .env files needed for config
   
-###startup
+### startup
   
  ```
  python3 ./LGAPI/main.py
