@@ -2,11 +2,12 @@
 
 ## describe
   스마트 구명조끼 시스템 LeisureGuardian 을 위한 API
+  python 3.7 recommended
 
 ## start
   setup
  ```
- npm install
+ pip install requirements.txt
  ```
   .env files needed for config
   
